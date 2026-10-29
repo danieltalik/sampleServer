@@ -1,32 +1,49 @@
 package org.example.service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.entity.Pets;
+import org.example.mapper.PetMapper;
 import org.example.repository.PetRepository;
 import org.openapitools.model.Pet;
-import org.springframework.http.HttpStatusCode;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.Optional;
 
-import static org.example.utli.MappingUtil.petList;
-import static org.example.utli.MappingUtil.getPet;
-
-
-@RequiredArgsConstructor
 @Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PetService {
 
     private final PetRepository petRepository;
 
-    public ResponseEntity<List<Pet>> getAllPets(){
-        List<Pet> petsList = petList(petRepository.findAll());
-        return new ResponseEntity<>(petsList, HttpStatusCode.valueOf(200));
+    public List<Pet> getAllPets() {
+        return petRepository.findAll().stream().map(PetMapper::toApi).toList();
     }
 
-    public ResponseEntity<Pet> getPetById(String petId){
-        Pet pet = getPet(Optional.of(petRepository.getReferenceById(Integer.valueOf(petId))));
-        return new ResponseEntity<>(pet,HttpStatusCode.valueOf(200));
+    public Optional<Pet> getPetById(int id) {
+        return petRepository.findById(id).map(PetMapper::toApi);
     }
 
+    @Transactional
+    public Pet createPet(Pet pet) {
+        return PetMapper.toApi(petRepository.save(PetMapper.copyInto(pet, new Pets())));
+    }
+
+    @Transactional
+    public Optional<Pet> updatePet(int id, Pet pet) {
+        return petRepository.findById(id)
+                .map(existing -> PetMapper.toApi(petRepository.save(PetMapper.copyInto(pet, existing))));
+    }
+
+    /** Returns false when no pet has that id. */
+    @Transactional
+    public boolean deletePet(int id) {
+        if (!petRepository.existsById(id)) {
+            return false;
+        }
+        petRepository.deleteById(id);
+        return true;
+    }
 }
